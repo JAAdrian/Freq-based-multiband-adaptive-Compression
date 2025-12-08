@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "MBDR"
+version = "0.1.0"
+requires-python = ">= 3.14"
+dependencies = []
+authors = []
+maintainers = [{ name = "Jens-Alrik Adrian", email = "jensalrik.adrian@gmail.com" }]
+description = ""
+readme = "README.md"
+license = "bsd-3-clause"
+license-files = ["LICENSE"]
