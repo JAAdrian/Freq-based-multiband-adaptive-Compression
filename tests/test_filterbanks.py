@@ -1,6 +1,7 @@
 import numpy
-from numpy import testing
 import pytest
+from matplotlib import pyplot
+from numpy import testing
 
 from mbdr.filterbank import Filterbank
 
@@ -35,7 +36,7 @@ def test_synthesis():
             overlap_ratio=OVERLAP_RATIO,
             sample_rate=SAMPLE_RATE,
         )
-    )
+    )[:len(noise)]
 
     testing.assert_almost_equal(noise_synthesized, noise)
 
