@@ -1,13 +1,13 @@
+import numpy
 from scipy import signal
 from scipy.signal import windows
-import numpy
 
-WINDOW = "hann"
+WINDOW_FUNCTION = "hamming"
 
 
 class Filterbank:
     def __init__(self):
-        self._transform: signal.ShortTimeFFT = None # type: ignore
+        self._transform: signal.ShortTimeFFT = None  # type: ignore
 
     def analysis(
         self,
@@ -20,7 +20,7 @@ class Filterbank:
         overlap = round(block_size * overlap_ratio)
 
         hop_size = block_size - overlap
-        window = windows.hann(block_size, sym=False)
+        window = getattr(windows, WINDOW_FUNCTION)(block_size, sym=False)
         fft_size = int(2 ** (numpy.ceil(numpy.log2(block_size))))
 
         self._transform = signal.ShortTimeFFT(
@@ -32,7 +32,6 @@ class Filterbank:
             scale_to="magnitude",
         )
         return self._transform.stft(x)
-
 
     def synthesis(self, spectrum: numpy.ndarray):
         return self._transform.istft(S=spectrum)
