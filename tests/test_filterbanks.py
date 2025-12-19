@@ -1,6 +1,7 @@
+"""Test suite for the filterbank module."""
+
 import numpy
 import pytest
-from matplotlib import pyplot
 from numpy import testing
 
 from mbdr.filterbank import Filterbank
@@ -36,7 +37,7 @@ def test_synthesis():
             overlap_ratio=OVERLAP_RATIO,
             sample_rate=SAMPLE_RATE,
         )
-    )[:len(noise)]
+    )[: len(noise)]
 
     testing.assert_almost_equal(noise_synthesized, noise)
 
