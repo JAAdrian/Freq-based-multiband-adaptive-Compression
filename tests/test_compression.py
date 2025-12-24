@@ -17,7 +17,7 @@ def audio_signal():
 def test_compression(audio_signal):
     """Test whether the multiband compression returns a signal."""
     signal, sample_rate = audio_signal
-    gains = 9 * (0)
+    gains = 9 * (0,)
 
     compressed_signal = mbdr.compress_signal(
         signal=signal, prescriptive_gains=gains, sample_rate=sample_rate

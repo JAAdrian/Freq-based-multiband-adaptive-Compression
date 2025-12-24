@@ -8,32 +8,51 @@ DEFAULT_OVERLAP_RATIO = 0.5
 
 
 class Filterbank:
-    def __init__(self):
-        self._transform: signal.ShortTimeFFT = None  # type: ignore
-
-    def analysis(
+    def __init__(
         self,
-        x: numpy.ndarray,
         sample_rate: int,
         block_size_sec: float = DEFAULT_BLOCK_SIZE_SEC,
         overlap_ratio: float = DEFAULT_OVERLAP_RATIO,
     ):
-        block_size = round(block_size_sec * sample_rate)
-        overlap = round(block_size * overlap_ratio)
+        self._transform: signal.ShortTimeFFT = None  # type: ignore
 
-        hop_size = block_size - overlap
-        window = getattr(windows, WINDOW_FUNCTION)(block_size, sym=False)
-        fft_size = int(2 ** (numpy.ceil(numpy.log2(block_size))))
+        self._sample_rate = sample_rate
+        self._block_size = block_size = round(block_size_sec * sample_rate)
+        self._overlap = round(block_size * overlap_ratio)
+        self._hop_size = block_size - self._overlap
+        self._fft_size = int(2 ** (numpy.ceil(numpy.log2(self._block_size))))
+
+    def analysis(self, x: numpy.ndarray):
+        window = getattr(windows, WINDOW_FUNCTION)(self._block_size, sym=False)
 
         self._transform = signal.ShortTimeFFT(
             win=window,
-            hop=hop_size,
-            fs=sample_rate,
+            hop=self._hop_size,
+            fs=self._sample_rate,
             fft_mode="onesided",
-            mfft=fft_size,
+            mfft=self._fft_size,
             scale_to="magnitude",
         )
         return self._transform.stft(x)
 
-    def synthesis(self, spectrum: numpy.ndarray):
-        return self._transform.istft(S=spectrum)
+    def synthesis(self, spectrum: numpy.ndarray, original_signal_length: int):
+        return self._transform.istft(S=spectrum)[:original_signal_length]
+
+    @property
+    def fft_size(self) -> int:
+        return self._fft_size
+
+
+def get_lower_edge_frequency(center_frequency: numpy.ndarray | int) -> numpy.ndarray:
+    return numpy.round(center_frequency / 2**0.25)
+
+
+def get_upper_edge_frequency(center_frequency: numpy.ndarray | int) -> numpy.ndarray:
+    return numpy.round(center_frequency * 2**0.25)
+
+
+def get_bin_index(
+    frequency: float | numpy.ndarray, fft_size: int, sample_rate: int
+) -> int:
+    bin_resolution = sample_rate / fft_size
+    return round(frequency / bin_resolution)
