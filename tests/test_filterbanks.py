@@ -12,6 +12,7 @@ OVERLAP_RATIO = 0.5
 
 
 def test_analysis():
+    """Test wether the analysis works."""
     impulse = numpy.array(numpy.eye(N=512, M=1)).ravel()
 
     filterbank = Filterbank()
@@ -27,6 +28,7 @@ def test_analysis():
 
 
 def test_synthesis():
+    """Test wether the synthesis works."""
     noise = numpy.random.randn(1 * SAMPLE_RATE)
 
     filterbank = Filterbank()
