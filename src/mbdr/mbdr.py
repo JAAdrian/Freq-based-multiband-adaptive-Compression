@@ -21,7 +21,7 @@ CENTER_FREQUENCIES_HZ = (250, 500, 1_000, 1_500, 2_000, 3_000, 4_000, 6_000, 8_0
 BLOCK_SIZE_SEC = 32e-3
 OVERLAP_RATIO = 0.5
 
-DEBUG = True
+DEBUG = False
 
 
 def compress_signal(
@@ -89,7 +89,7 @@ def _add_gain(
     return output_spectrum
 
 
-def _apply_compression(stft: numpy.ndarray) -> numpy.ndarray:
+def _get_compression_function(stft: numpy.ndarray) -> numpy.ndarray:
     pass
 
 
