@@ -5,3 +5,5 @@
 *.egg-info
 .venv
 __pycache__
+
+*.pdf
