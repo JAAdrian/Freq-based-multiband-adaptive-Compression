@@ -21,12 +21,15 @@ CENTER_FREQUENCIES_HZ = (250, 500, 1_000, 1_500, 2_000, 3_000, 4_000, 6_000, 8_0
 BLOCK_SIZE_SEC = 32e-3
 OVERLAP_RATIO = 0.5
 
-DEBUG = False
+DEBUG = True
 
 
 def compress_signal(
     signal: numpy.ndarray,
     prescriptive_gains: tuple[int],
+    compression_threshold: int,
+    compression_ratio: int,
+    knee_width: int,
     sample_rate: int = SAMPLE_RATE,
 ) -> numpy.ndarray:
     """Compress the input signal based on freq-based multiband adaptive compression."""
@@ -40,6 +43,15 @@ def compress_signal(
     original_phase = numpy.angle(stft)
     power_spectrum = 20 * numpy.log10(numpy.abs(stft))
 
+    if DEBUG:
+        from matplotlib import pyplot
+
+        fig, ax = pyplot.subplots(figsize=(12, 12 / 1.618))
+        pc = ax.pcolormesh(power_spectrum)
+        fig.colorbar(pc, ax=ax)
+
+        pyplot.show()
+
     signal_plus_gain = _add_gain(
         power_spectrum=power_spectrum,
         filterbank=fb,
@@ -47,8 +59,13 @@ def compress_signal(
         center_frequencies_hertz=CENTER_FREQUENCIES_HZ,  # type: ignore
         sample_rate=sample_rate,
     )
-    compressed_power_spectrum = _apply_compression(stft=signal_plus_gain)
-    smoothed_power_spectrum = _smooth_gains(stft=compressed_power_spectrum)
+    compression_function = _get_compression_function(
+        power_spectrum=signal_plus_gain,
+        compression_threshold=compression_threshold,
+        compression_ratio=compression_ratio,
+        knee_width=knee_width,
+    )
+    smoothed_power_spectrum = _smooth_gains(compression_function=compression_function)
 
     smoothed_magnitudes = 10 ** (smoothed_power_spectrum / 20)
     compressed_signal = fb.synthesis(
@@ -89,9 +106,31 @@ def _add_gain(
     return output_spectrum
 
 
-def _get_compression_function(stft: numpy.ndarray) -> numpy.ndarray:
-    pass
+def _get_compression_function(
+    power_spectrum: numpy.ndarray,
+    compression_threshold: int,
+    compression_ratio: int,
+    knee_width: int,
+) -> numpy.ndarray:
+    compression_function = power_spectrum
+
+    f_two = numpy.where(
+        2 * numpy.abs(power_spectrum - compression_threshold) <= knee_width
+    )
+    compression_function[f_two] += (
+        (1 / compression_ratio - 1)
+        * (power_spectrum[f_two] - compression_threshold + knee_width / 2) ** 2
+        / (2 * knee_width)
+    )
+
+    f_three = numpy.where(2 * (power_spectrum - compression_threshold) > knee_width)
+    compression_function[f_three] = (
+        compression_threshold
+        + (power_spectrum[f_three] - compression_threshold) / compression_ratio
+    )
+
+    return compression_function
 
 
-def _smooth_gains(stft: numpy.ndarray) -> numpy.ndarray:
+def _smooth_gains(compression_function: numpy.ndarray) -> numpy.ndarray:
     pass

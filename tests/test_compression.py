@@ -19,8 +19,17 @@ def test_compression(audio_signal):
     signal, sample_rate = audio_signal
     gains = 9 * (0,)
 
+    compression_threshold = -60
+    compression_ratio = 2
+    knee_width = 5
+
     compressed_signal = mbdr.compress_signal(
-        signal=signal, prescriptive_gains=gains, sample_rate=sample_rate
+        signal=signal,
+        prescriptive_gains=gains,  # type: ignore
+        compression_threshold=compression_threshold,
+        compression_ratio=compression_ratio,
+        knee_width=knee_width,
+        sample_rate=sample_rate,
     )
 
 
