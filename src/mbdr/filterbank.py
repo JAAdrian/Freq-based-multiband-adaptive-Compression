@@ -7,6 +7,28 @@ DEFAULT_BLOCK_SIZE_SEC = 32e-3
 DEFAULT_OVERLAP_RATIO = 0.5
 
 
+def compute_stft(
+    x: numpy.ndarray,
+    window: numpy.ndarray,
+    sample_rate: int,
+    hop_size: int,
+    fft_size: int,
+) -> tuple[numpy.ndarray, signal.ShortTimeFFT]:
+    transform = signal.ShortTimeFFT(
+        win=window,
+        hop=hop_size,
+        fs=sample_rate,
+        fft_mode="onesided",
+        mfft=fft_size,
+        scale_to="magnitude",
+    )
+    return transform.stft(x), transform
+
+
+def get_fft_size(block_size: int) -> int:
+    return int(2 ** (numpy.ceil(numpy.log2(block_size))))
+
+
 class Filterbank:
     def __init__(
         self,
@@ -20,20 +42,19 @@ class Filterbank:
         self._block_size = block_size = round(block_size_sec * sample_rate)
         self._overlap = round(block_size * overlap_ratio)
         self._hop_size = block_size - self._overlap
-        self._fft_size = int(2 ** (numpy.ceil(numpy.log2(self._block_size))))
+        self._fft_size = get_fft_size(self._block_size)
 
     def analysis(self, x: numpy.ndarray):
         window = getattr(windows, WINDOW_FUNCTION)(self._block_size, sym=False)
 
-        self._transform = signal.ShortTimeFFT(
-            win=window,
-            hop=self._hop_size,
-            fs=self._sample_rate,
-            fft_mode="onesided",
-            mfft=self._fft_size,
-            scale_to="magnitude",
+        stft, self._transfrom = compute_stft(
+            x=x,
+            window=window,
+            sample_rate=self._sample_rate,
+            hop_size=self._hop_size,
+            fft_size=self._fft_size,
         )
-        return self._transform.stft(x)
+        return stft
 
     def synthesis(self, spectrum: numpy.ndarray, original_signal_length: int):
         return self._transform.istft(S=spectrum)[:original_signal_length]

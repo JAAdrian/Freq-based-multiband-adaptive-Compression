@@ -3,6 +3,11 @@
 import numpy
 
 
+def spectral_flux(magnitudes: numpy.ndarray) -> numpy.ndarray:
+    spectral_difference = magnitudes[:, 1:] - magnitudes[:, :-1]
+    return numpy.mean(spectral_difference**2, axis=0)
+
+
 def RecursiveSmoother(
     time_series: numpy.ndarray,
     time_constant: float,
