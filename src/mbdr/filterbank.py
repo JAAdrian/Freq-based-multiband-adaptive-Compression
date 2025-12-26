@@ -63,6 +63,10 @@ class Filterbank:
     def fft_size(self) -> int:
         return self._fft_size
 
+    @property
+    def hop_size(self) -> int:
+        return self._hop_size
+
 
 def get_lower_edge_frequency(center_frequency: numpy.ndarray | int) -> numpy.ndarray:
     return numpy.round(center_frequency / 2**0.25)

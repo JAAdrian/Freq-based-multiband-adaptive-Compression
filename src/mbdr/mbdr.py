@@ -14,12 +14,15 @@ Compressor Paramters:
 import numpy
 
 from mbdr import filterbank as fbank
+from mbdr import utils
 
 SAMPLE_RATE = 16_000
 CENTER_FREQUENCIES_HZ = (250, 500, 1_000, 1_500, 2_000, 3_000, 4_000, 6_000, 8_000)
 
 BLOCK_SIZE_SEC = 32e-3
 OVERLAP_RATIO = 0.5
+
+FLUX_SMOOTHING_CONSTANT_SEC = 100e-3
 
 DEBUG = False
 
@@ -65,7 +68,12 @@ def compress_signal(
         compression_ratio=compression_ratio,
         knee_width=knee_width,
     )
-    smoothed_gain_function = _smooth_gains(compression_function=compression_function)
+    smoothed_gain_function = _smooth_gains(
+        signal_magnitudes=numpy.abs(stft),
+        compression_function=compression_function,
+        hop_size=fb.hop_size,
+        sample_rate=sample_rate,
+    )
 
     compressed_magnitudes = stft * 10 ** ((makeup_gain + smoothed_gain_function) / 20)
     compressed_signal = fb.synthesis(
@@ -131,5 +139,21 @@ def _get_compression_function(
     return compression_function
 
 
-def _smooth_gains(compression_function: numpy.ndarray) -> numpy.ndarray:
+def _smooth_gains(
+    signal_magnitudes: numpy.ndarray,
+    compression_function: numpy.ndarray,
+    hop_size: int,
+    sample_rate: int,
+) -> numpy.ndarray:
+    power_spectrum = 20 * numpy.log10(signal_magnitudes)
+    flux = utils.spectral_flux(magnitudes=signal_magnitudes)
+
+    frame_rate = sample_rate // hop_size
+    smoother = utils.RecursiveSmoother(
+        time_series=flux,
+        time_constant=FLUX_SMOOTHING_CONSTANT_SEC,
+        sample_rate=frame_rate,
+    )
+    smoothed_flux = numpy.fromiter(smoother, dtype=float)
+
     return numpy.zeros_like(compression_function)
