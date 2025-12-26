@@ -1,4 +1,4 @@
-"""Oridnary recursive smoothing functions."""
+"""Utility functions such as recursive smoothing and spectral flux."""
 
 import numpy
 

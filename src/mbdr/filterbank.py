@@ -47,7 +47,7 @@ class Filterbank:
     def analysis(self, x: numpy.ndarray):
         window = getattr(windows, WINDOW_FUNCTION)(self._block_size, sym=False)
 
-        stft, self._transfrom = compute_stft(
+        stft, self._transform = compute_stft(
             x=x,
             window=window,
             sample_rate=self._sample_rate,
