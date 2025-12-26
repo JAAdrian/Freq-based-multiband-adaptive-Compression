@@ -22,6 +22,7 @@ def test_compression(audio_signal):
     compression_threshold = -60
     compression_ratio = 2
     knee_width = 5
+    makeup_gain = 5
 
     compressed_signal = mbdr.compress_signal(
         signal=signal,
@@ -29,8 +30,11 @@ def test_compression(audio_signal):
         compression_threshold=compression_threshold,
         compression_ratio=compression_ratio,
         knee_width=knee_width,
+        makeup_gain=makeup_gain,
         sample_rate=sample_rate,
     )
+
+    assert len(compressed_signal) == len(signal)
 
 
 if __name__ == "__main__":

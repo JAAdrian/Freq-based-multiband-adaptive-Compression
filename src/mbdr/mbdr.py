@@ -21,7 +21,7 @@ CENTER_FREQUENCIES_HZ = (250, 500, 1_000, 1_500, 2_000, 3_000, 4_000, 6_000, 8_0
 BLOCK_SIZE_SEC = 32e-3
 OVERLAP_RATIO = 0.5
 
-DEBUG = True
+DEBUG = False
 
 
 def compress_signal(
@@ -30,6 +30,7 @@ def compress_signal(
     compression_threshold: int,
     compression_ratio: int,
     knee_width: int,
+    makeup_gain: int = 0,
     sample_rate: int = SAMPLE_RATE,
 ) -> numpy.ndarray:
     """Compress the input signal based on freq-based multiband adaptive compression."""
@@ -40,7 +41,6 @@ def compress_signal(
     )
 
     stft = fb.analysis(x=signal)
-    original_phase = numpy.angle(stft)
     power_spectrum = 20 * numpy.log10(numpy.abs(stft))
 
     if DEBUG:
@@ -65,12 +65,11 @@ def compress_signal(
         compression_ratio=compression_ratio,
         knee_width=knee_width,
     )
-    smoothed_power_spectrum = _smooth_gains(compression_function=compression_function)
+    smoothed_gain_function = _smooth_gains(compression_function=compression_function)
 
-    smoothed_magnitudes = 10 ** (smoothed_power_spectrum / 20)
+    compressed_magnitudes = stft * 10 ** ((makeup_gain + smoothed_gain_function) / 20)
     compressed_signal = fb.synthesis(
-        spectrum=smoothed_magnitudes * numpy.exp(1j * original_phase),
-        original_signal_length=len(signal),
+        spectrum=compressed_magnitudes, original_signal_length=len(signal)
     )
     return compressed_signal
 
@@ -133,4 +132,4 @@ def _get_compression_function(
 
 
 def _smooth_gains(compression_function: numpy.ndarray) -> numpy.ndarray:
-    pass
+    return numpy.zeros_like(compression_function)

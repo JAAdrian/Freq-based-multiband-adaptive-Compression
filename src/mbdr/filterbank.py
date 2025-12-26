@@ -76,4 +76,4 @@ def get_bin_index(
     frequency: float | numpy.ndarray, fft_size: int, sample_rate: int
 ) -> int:
     bin_resolution = sample_rate / fft_size
-    return round(frequency / bin_resolution)
+    return round(frequency / bin_resolution)  # type: ignore
