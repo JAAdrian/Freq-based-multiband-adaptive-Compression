@@ -8,12 +8,14 @@ version = "0.1.0"
 requires-python = ">= 3.14"
 dependencies = ["numpy~=2.3", "scipy~=1.16"]
 authors = []
-maintainers = [{ name = "Jens-Alrik Adrian", email = "jensalrik.adrian@gmail.com" }]
+maintainers = [
+    { name = "Jens-Alrik Adrian", email = "jensalrik.adrian@gmail.com" },
+]
 description = ""
 readme = "README.md"
 license = "bsd-3-clause"
 license-files = ["LICENSE"]
 
 [project.optional-dependencies]
-test = ["pytest~=9.0", "soundfile~=0.13"]
+test = ["matplotlib~=3.10", "pytest~=9.0", "soundcard~=0.4", "soundfile~=0.13"]
 debug = ["matplotlib~=3.10"]

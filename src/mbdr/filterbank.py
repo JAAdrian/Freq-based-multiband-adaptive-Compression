@@ -1,3 +1,5 @@
+"""The filterbank tools."""
+
 import numpy
 from scipy import signal
 from scipy.signal import windows

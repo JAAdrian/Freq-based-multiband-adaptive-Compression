@@ -57,33 +57,33 @@ def compress_signal(
     )
 
     stft = fb.analysis(x=signal)
-    power_spectrum = 20 * numpy.log10(numpy.abs(stft))
+    signal_magnitudes = numpy.abs(stft)
 
     if DEBUG:
         from matplotlib import pyplot
 
         fig, ax = pyplot.subplots(figsize=(12, 12 / 1.618))
-        pc = ax.pcolormesh(power_spectrum)
+        pc = ax.pcolormesh(20 * numpy.log10(signal_magnitudes))
         fig.colorbar(pc, ax=ax)
 
         pyplot.show()
 
-    signal_plus_gain = _add_gain(
-        power_spectrum=power_spectrum,
+    signal_plus_gain = _add_audiogram_gain(
+        magnitudes=signal_magnitudes,
         filterbank=fb,
         gains=prescriptive_gains,
         center_frequencies_hertz=CENTER_FREQUENCIES_HZ,  # type: ignore
         sample_rate=sample_rate,
     )
     compression_function = _get_compression_function(
-        power_spectrum=signal_plus_gain,
+        amplified_power_spectrum=signal_plus_gain,
         compression_threshold=compression_threshold,
         compression_ratio=compression_ratio,
         knee_width=knee_width,
     )
     smoothed_gain_function = _smooth_gains(
-        signal_magnitudes=numpy.abs(stft),
         compression_function=compression_function,
+        signal_magnitudes=signal_magnitudes,
         hop_size=fb.hop_size,
         attack_time=attack_time,
         sample_rate=sample_rate,
@@ -96,8 +96,8 @@ def compress_signal(
     return compressed_signal
 
 
-def _add_gain(
-    power_spectrum: numpy.ndarray,
+def _add_audiogram_gain(
+    magnitudes: numpy.ndarray,
     filterbank: fbank.Filterbank,
     gains: tuple[int],
     center_frequencies_hertz: tuple[int],
@@ -108,7 +108,7 @@ def _add_gain(
             "The number of gain values must match the number of center frequencies"
         )
 
-    output_spectrum = power_spectrum
+    amplified_spectrum = 20 * numpy.log10(magnitudes)
 
     for frequency_index, center_frequency in enumerate(center_frequencies_hertz):
         lower_bin = fbank.get_bin_index(
@@ -122,47 +122,56 @@ def _add_gain(
             sample_rate=sample_rate,
         )
 
-        output_spectrum[lower_bin:upper_bin, :] += gains[frequency_index]
+        amplified_spectrum[lower_bin:upper_bin, :] += gains[frequency_index]
 
-    return output_spectrum
+    return amplified_spectrum
 
 
 def _get_compression_function(
-    power_spectrum: numpy.ndarray,
+    amplified_power_spectrum: numpy.ndarray,
     compression_threshold: int,
     compression_ratio: int,
     knee_width: int,
 ) -> numpy.ndarray:
-    compression_function = power_spectrum
+    compression_function = amplified_power_spectrum
 
     f_two = numpy.where(
-        2 * numpy.abs(power_spectrum - compression_threshold) <= knee_width
+        2 * numpy.abs(amplified_power_spectrum - compression_threshold) <= knee_width
     )
     compression_function[f_two] += (
         (1 / compression_ratio - 1)
-        * (power_spectrum[f_two] - compression_threshold + knee_width / 2) ** 2
+        * (amplified_power_spectrum[f_two] - compression_threshold + knee_width / 2)
+        ** 2
         / (2 * knee_width)
     )
 
-    f_three = numpy.where(2 * (power_spectrum - compression_threshold) > knee_width)
+    f_three = numpy.where(
+        2 * (amplified_power_spectrum - compression_threshold) > knee_width
+    )
     compression_function[f_three] = (
         compression_threshold
-        + (power_spectrum[f_three] - compression_threshold) / compression_ratio
+        + (amplified_power_spectrum[f_three] - compression_threshold)
+        / compression_ratio
     )
 
     return compression_function
 
 
 def _smooth_gains(
-    signal_magnitudes: numpy.ndarray,
     compression_function: numpy.ndarray,
+    signal_magnitudes: numpy.ndarray,
     hop_size: int,
     attack_time: float,
     sample_rate: int,
 ) -> numpy.ndarray:
     power_spectrum = 20 * numpy.log10(signal_magnitudes)
-    compression_residual = compression_function - power_spectrum
 
+    # This is W_G in equation (5).
+    compression_residual = compression_function - power_spectrum
+    delayed_compression_residual = numpy.roll(compression_residual, shift=1, axis=1)
+    delayed_compression_residual = delayed_compression_residual[:, :-1]
+
+    # Compute spectral flux and smooth it based on a guessed time constant.
     flux = utils.spectral_flux(magnitudes=signal_magnitudes)
 
     frame_rate = sample_rate // hop_size
@@ -172,31 +181,42 @@ def _smooth_gains(
         sample_rate=frame_rate,
     )
     smoothed_flux = numpy.fromiter(smoother, dtype=float)
+
+    # Compute the adaptive release time from equation (6).
     adaptive_release_time = numpy.maximum(
         MINIMUM_RELEASE_TIME_SEC,
         MINIMUM_RELEASE_TIME_SEC / (smoothed_flux**FLUX_GAMMA + FLUX_EPSILON),
     )
+
+    # Introduce an upper bound to not overshoot the MAXIMUM_RELEASE_TIME_SEC.
     adaptive_release_time = numpy.minimum(
         MAXIMUM_RELEASE_TIME_SEC, adaptive_release_time
     )
     alphas_release = 1 - numpy.exp(-1 / (adaptive_release_time * frame_rate))
 
+    # Iterate over each time frame and smooth by applying attack and release times.
     smoothed_gains = list()
     alpha_attack = 1 - numpy.exp(-1 / (attack_time * frame_rate))
     for index, (residual, alpha_release) in enumerate(
-        zip(compression_residual[:, 1:].T, alphas_release)
+        zip(delayed_compression_residual.T, alphas_release, strict=True)
     ):
-        compression_value = compression_function[:, index]
+        compression_gain = compression_function[:, index]
 
-        new_gain = numpy.zeros_like(residual)
-        new_gain[residual > compression_value] = (
-            alpha_attack * residual + (1 - alpha_attack) * compression_value
-        )
-        new_gain[residual >= compression_value] = (
-            alpha_release * residual + (1 - alpha_release) * compression_value
-        )
+        frame_gain = numpy.zeros_like(residual)
+        residual_greater_than_compression = residual > compression_gain
+        residual_less_than_compression = residual <= compression_gain
 
-        smoothed_gains.append(new_gain)
+        if numpy.sum(residual_greater_than_compression):
+            frame_gain[residual_greater_than_compression] = (
+                alpha_attack * residual + (1 - alpha_attack) * compression_gain
+            )
+        if numpy.sum(residual_less_than_compression):
+            frame_gain[residual_less_than_compression] = (
+                alpha_release * residual + (1 - alpha_release) * compression_gain
+            )
 
+        smoothed_gains.append(frame_gain)
+
+    # Add the last frame to counteract the loss of one frame due to spectral flux.
     smoothed_gains.append(smoothed_gains[-1])
     return numpy.stack(smoothed_gains, axis=1)
