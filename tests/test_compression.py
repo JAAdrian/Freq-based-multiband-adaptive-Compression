@@ -52,7 +52,10 @@ def _plot_welch(
         frequency, 10 * numpy.log10(psd_original), label="Original", linewidth=2
     )
     ax.semilogx(
-        frequency, 10 * numpy.log10(psd_compressed), label="Compressed", linewidth=2
+        frequency,
+        10 * numpy.log10(psd_compressed),
+        label="Amplified and Compressed",
+        linewidth=2,
     )
     ax.legend()
     ax.grid()
@@ -74,7 +77,7 @@ def _plot_spectrogram(
     pyplot.colorbar(mesh)
 
     mesh = ax[1].pcolormesh(time, frequency, 20 * numpy.log10(stft_compressed))
-    ax[1].set_title("Compressed")
+    ax[1].set_title("Amplified and Compressed")
     ax[1].set_ylabel("Frequency / Hz")
     ax[1].set_xlabel("Time / s")
     pyplot.colorbar(mesh)
@@ -139,9 +142,9 @@ def test_compression(signal_and_samplerate):
         _rms(compressed_signal), _rms(original_signal), decimal=1
     )
 
-    # player = soundcard.default_speaker()
-    # player.play(data=original_signal, samplerate=sample_rate)
-    # player.play(data=compressed_signal, samplerate=sample_rate)
+    player = soundcard.default_speaker()
+    player.play(data=original_signal, samplerate=sample_rate)
+    player.play(data=compressed_signal, samplerate=sample_rate)
 
     _plot_welch(original_signal, compressed_signal, sample_rate)
     _plot_spectrogram(original_signal, compressed_signal, sample_rate)

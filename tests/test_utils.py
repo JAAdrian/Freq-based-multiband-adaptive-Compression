@@ -27,9 +27,9 @@ def _get_stft(time_domain_signal) -> numpy.ndarray:
     stft, _ = filterbank.compute_stft(
         x=time_domain_signal,
         window=window,
-        sample_rate=SAMPLE_RATE,
         hop_size=hop_size,
         fft_size=fft_size,
+        sample_rate=SAMPLE_RATE,
     )
     return stft
 

@@ -49,7 +49,26 @@ def compress_signal(
     attack_time: float = DEFAULT_ATTACK_TIME_SEC,
     sample_rate: int = DEFAULT_SAMPLE_RATE,
 ) -> numpy.ndarray:
-    """Compress the input signal based on freq-based multiband adaptive compression."""
+    """Compress the input signal based on freq-based multiband adaptive compression.
+
+    Args:
+        signal: Single-channel input audio signal.
+        prescriptive_gains: Tuple of 9 gains in dB for each half-octave band.
+        compression_threshold: The compressor's threshold in dB .
+                               Defaults to DEFAULT_COMPRESSION_THRESHOLD.
+        compression_ratio: The compressor's ratio as an integer.
+                           Defaults to DEFAULT_COMPRESSION_RATIO.
+        knee_width: The compressor's knee width. Defaults to DEFAULT_KNEE_WIDTH.
+        makeup_gain: The applied makeup gain after compression in dB.
+                     Defaults to DEFAULT_MAKEUP_GAIN.
+        attack_time: The compressor's attack time in seconds.
+                     Defaults to DEFAULT_ATTACK_TIME_SEC.
+        sample_rate: The corresponding sample rate in Hz.
+                     Defaults to DEFAULT_SAMPLE_RATE.
+
+    Returns:
+        Compressed single-channel time-domain signal.
+    """
     fb = fbank.Filterbank(
         block_size_sec=BLOCK_SIZE_SEC,
         overlap_ratio=OVERLAP_RATIO,
@@ -85,13 +104,13 @@ def compress_signal(
         compression_function=compression_function,
         signal_magnitudes=signal_magnitudes,
         hop_size=fb.hop_size,
-        attack_time=attack_time,
+        attack_time_sec=attack_time,
         sample_rate=sample_rate,
     )
 
     compressed_magnitudes = stft * 10 ** ((makeup_gain + smoothed_gain_function) / 20)
     compressed_signal = fb.synthesis(
-        spectrum=compressed_magnitudes, original_signal_length=len(signal)
+        stft=compressed_magnitudes, original_signal_length=len(signal)
     )
     return compressed_signal
 
@@ -103,6 +122,25 @@ def _add_audiogram_gain(
     center_frequencies_hertz: tuple[int],
     sample_rate: int,
 ) -> numpy.ndarray:
+    """Add the prescriptive gains to the actual power spectrum.
+
+    This is the data basis on which the compression function is applied.
+
+    Args:
+        magnitudes: The audio signal's time-frequency representation in magnitude
+                    scaling.
+        filterbank: The used filterbank object.
+        gains: The prescriptive audiogram gains in dB.
+        center_frequencies_hertz: The audiogram's center frequencies in Hz.
+        sample_rate: The corresponding sample rate in Hz.
+
+    Raises:
+        ValueError: Raised when the number of gains does not match the numer of center
+                    frequencies.
+
+    Returns:
+        The power spectrum after applied prescriptive gains.
+    """
     if len(gains) != len(center_frequencies_hertz):
         raise ValueError(
             "The number of gain values must match the number of center frequencies"
@@ -133,6 +171,17 @@ def _get_compression_function(
     compression_ratio: int,
     knee_width: int,
 ) -> numpy.ndarray:
+    """Compute the compression function based on the amplified power spectrum.
+
+    Args:
+        amplified_power_spectrum: The amplified power spectrum in simple V²-scaling.
+        compression_threshold: The compressor's threshold in dB.
+        compression_ratio: The compressor's ratio.
+        knee_width: The compressor's kneewidth.
+
+    Returns:
+        Compression function with the same dimensions and shape as the input spectrum.
+    """
     compression_function = amplified_power_spectrum
 
     f_two = numpy.where(
@@ -161,9 +210,22 @@ def _smooth_gains(
     compression_function: numpy.ndarray,
     signal_magnitudes: numpy.ndarray,
     hop_size: int,
-    attack_time: float,
+    attack_time_sec: float,
     sample_rate: int,
 ) -> numpy.ndarray:
+    """Gain smoothing which applies an adaptive release time in t-f-domain.
+
+    Args:
+        compression_function: The compression function which is the amplification
+                              matrix.
+        signal_magnitudes: The input signal's magnitudes in plain STFT scaling.
+        hop_size: The transform's hop size (frameshift) in samples.
+        attack_time_sec: The desired attack time in seconds.
+        sample_rate: The corresponding sample rate in hZ.
+
+    Returns:
+        The final gain matrix after compression and gain smoothing.
+    """
     power_spectrum = 20 * numpy.log10(signal_magnitudes)
 
     # This is W_G in equation (5).
@@ -196,7 +258,7 @@ def _smooth_gains(
 
     # Iterate over each time frame and smooth by applying attack and release times.
     smoothed_gains = list()
-    alpha_attack = 1 - numpy.exp(-1 / (attack_time * frame_rate))
+    alpha_attack = 1 - numpy.exp(-1 / (attack_time_sec * frame_rate))
     for index, (residual, alpha_release) in enumerate(
         zip(delayed_compression_residual.T, alphas_release, strict=True)
     ):
