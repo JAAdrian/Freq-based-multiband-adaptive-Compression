@@ -5,6 +5,8 @@
 *.egg-info
 .venv
 __pycache__
+build/
+dist/
 
 *.pdf
 *.flac

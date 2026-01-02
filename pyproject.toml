@@ -17,5 +17,6 @@ license = "bsd-3-clause"
 license-files = ["LICENSE"]
 
 [project.optional-dependencies]
+build = ["build"]
 test = ["matplotlib~=3.10", "pytest~=9.0", "soundcard~=0.4", "soundfile~=0.13"]
 debug = ["matplotlib~=3.10"]
